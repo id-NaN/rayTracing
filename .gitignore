@@ -5,8 +5,10 @@ bin-int/
 .idea/
 
 # Files
+*.vcxproj
 *.vcxproj.user
 *.vcxproj.filters
+*.sln
 *.imgui.ini
 
 # Exclude

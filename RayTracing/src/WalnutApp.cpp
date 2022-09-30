@@ -5,105 +5,92 @@
 #include "Walnut/Random.h"
 #include "Walnut/Timer.h"
 
+#include "Renderer.h"
+
 using namespace Walnut;
 
-class ExampleLayer : public Walnut::Layer
+class RaytracingLayer : public Layer
 {
 public:
-	virtual void OnUIRender() override
-	{
+    void OnUIRender() override
+    {
         bool rendered = false;
 
-		ImGui::Begin("Settings");
-        ImGui::Text("Last Render: %3fms", static_cast<double>(last_render_time_));
-		if (ImGui::Button("Render"))
-		{
+        ImGui::Begin("Settings");
+        ImGui::Text("Last Render: %.3fms", static_cast<double>(last_render_time_));
+        if (ImGui::Button("Render"))
+        {
             rendered = true;
             Render();
-		}
-		ImGui::End();
+        }
+        ImGui::End();
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         ImGui::Begin("Viewport");
         viewport_width_ = static_cast<uint32_t>(ImGui::GetContentRegionAvail().x);
         viewport_height_ = static_cast<uint32_t>(ImGui::GetContentRegionAvail().y);
-        if (image_)
+
+        std::shared_ptr<Image> image = renderer_.get_final_image();
+        if (image)
         {
             ImGui::Image(
-                image_->GetDescriptorSet(),
+                image->GetDescriptorSet(),
                 {
-                    static_cast<float>(image_->GetWidth()),
-                    static_cast<float>(image_->GetHeight())
-                }
+                    static_cast<float>(image->GetWidth()),
+                    static_cast<float>(image->GetHeight())
+                },
+                ImVec2(0, 1),
+                ImVec2(1, 0)
             );
         }
         ImGui::End();
         ImGui::PopStyleVar();
 
         if (!rendered && (
-            !image_ ||
-            viewport_width_ != image_->GetWidth() ||
-            viewport_height_ != image_->GetHeight()
+            !image ||
+            viewport_width_ != image->GetWidth() ||
+            viewport_height_ != image->GetHeight()
         ))
         {
             Render();
         }
-	}
+    }
 
     void Render()
-	{
+    {
         Timer timer;
-	    if (
-            !image_ ||
-            viewport_width_ != image_->GetWidth() ||
-            viewport_height_ != image_->GetHeight()
-        )
-	    {
-            image_ = std::make_shared<Image>(
-                viewport_width_,
-                viewport_height_,
-                ImageFormat::RGBA
-            );
-            delete[] image_data_;
-            image_data_ = new uint32_t[static_cast<uint64_t>(viewport_width_) * static_cast<uint64_t>(viewport_height_)];
-	    }
 
-        for (uint32_t i = 0; i < viewport_width_ * viewport_height_; i++)
-        {
-            image_data_[i] = Random::UInt();
-            image_data_[i] |= 0xff000000;
-        }
-
-        image_->SetData(image_data_);
+        renderer_.on_resize(viewport_width_, viewport_height_);
+        renderer_.render();
 
         last_render_time_ = timer.ElapsedMillis();
-	}
+    }
 
 private:
-    std::shared_ptr<Image> image_;
-    uint32_t* image_data_ = nullptr;
+    Renderer renderer_;
+
     uint32_t viewport_width_ = 0;
     uint32_t viewport_height_ = 0;
     float last_render_time_ = 0;
 };
 
-Walnut::Application* Walnut::CreateApplication(int argc, char** argv)
+Application* Walnut::CreateApplication(int argc, char** argv)
 {
-	Walnut::ApplicationSpecification spec;
-	spec.Name = "Ray Tracing";
+    ApplicationSpecification spec;
+    spec.Name = "Ray Tracing";
 
-	Walnut::Application* app = new Walnut::Application(spec);
-	app->PushLayer<ExampleLayer>();
-	app->SetMenubarCallback([app]()
-	{
-		if (ImGui::BeginMenu("File"))
-		{
-			if (ImGui::MenuItem("Exit"))
-			{
-				app->Close();
-			}
-			ImGui::EndMenu();
-		}
-	});
-	return app;
+    auto app = new Application(spec);
+    app->PushLayer<RaytracingLayer>();
+    app->SetMenubarCallback([app]()
+    {
+        if (ImGui::BeginMenu("File"))
+        {
+            if (ImGui::MenuItem("Exit"))
+            {
+                app->Close();
+            }
+            ImGui::EndMenu();
+        }
+    });
+    return app;
 }
